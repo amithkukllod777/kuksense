@@ -7,6 +7,12 @@ on:
     paths:
       - 'tools/kuksense-rssi/windows/**'
       - '.github/workflows/build-kuksense-exe.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tools/kuksense-rssi/windows/**'
+      - '.github/workflows/build-kuksense-exe.yml'
   workflow_dispatch:
 
 permissions:

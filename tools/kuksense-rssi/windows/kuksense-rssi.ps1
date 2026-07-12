@@ -12,6 +12,7 @@ function Get-WifiSamples {
     $raw = netsh wlan show networks mode=bssid
     $samples = @()
     $ssid = $null
+    $bssid = $null
 
     foreach ($line in $raw) {
         if ($line -match '^\s*SSID\s+\d+\s*:\s*(.*)$') {
@@ -105,8 +106,8 @@ while ($true) {
             $row | Export-Csv -Path $OutputPath -NoTypeInformation -Append
         }
 
-        Write-Host ("{0} | {1,-18} | {2,3}% | std {3,5} | score {4,5} | {5}" -f \
-            (Get-Date -Format "HH:mm:ss"), $sample.Ssid, $sample.SignalPct, $stdDev, $activityScore, $state)
+        $message = "{0} | {1,-18} | {2,3}% | std {3,5} | score {4,5} | {5}" -f (Get-Date -Format "HH:mm:ss"), $sample.Ssid, $sample.SignalPct, $stdDev, $activityScore, $state
+        Write-Host $message
     }
 
     Start-Sleep -Seconds $IntervalSeconds

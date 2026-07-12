@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KukSense RF Activity Dashboard</title>
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; color-scheme: dark; }
+    body { margin: 0; background: #0b1020; color: #eef2ff; }
+    main { max-width: 980px; margin: auto; padding: 24px; }
+    .card { background: #151b2f; border: 1px solid #2b3557; border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    h1 { margin: 0 0 8px; }
+    p { color: #b8c1dc; }
+    input { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #394468; background: #0f1528; color: #fff; box-sizing: border-box; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; }
+    .metric { background: #0f1528; border-radius: 12px; padding: 14px; }
+    .label { color: #9aa6c7; font-size: 13px; }
+    .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+    canvas { width: 100%; height: 300px; background: #0f1528; border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 10px; border-bottom: 1px solid #2b3557; text-align: left; }
+    .warning { color: #ffd166; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>KukSense RF Activity Dashboard</h1>
+    <p>Load the CSV produced by the Windows scanner. This visualizes Wi‑Fi signal disturbance only; it does not identify people or measure vital signs.</p>
+    <input id="file" type="file" accept=".csv,text/csv" />
+  </div>
+
+  <div class="grid">
+    <div class="metric"><div class="label">Latest state</div><div class="value" id="state">—</div></div>
+    <div class="metric"><div class="label">Activity score</div><div class="value" id="score">—</div></div>
+    <div class="metric"><div class="label">Networks tracked</div><div class="value" id="networks">—</div></div>
+    <div class="metric"><div class="label">Samples</div><div class="value" id="samples">—</div></div>
+  </div>
+
+  <div class="card">
+    <canvas id="chart" width="900" height="300"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Recent readings</h2>
+    <table>
+      <thead><tr><th>Time</th><th>SSID</th><th>Signal</th><th>Score</th><th>State</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+const fileInput = document.getElementById('file');
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].match(/("[^"]*"|[^,]+)/g).map(v => v.replace(/^"|"$/g, ''));
+  return lines.slice(1).map(line => {
+    const values = line.match(/("[^"]*"|[^,]*)/g).filter((_, i) => i % 2 === 0).map(v => v.replace(/^"|"$/g, ''));
+    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']));
+  });
+}
+
+function draw(rows) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#7aa2ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const recent = rows.slice(-200);
+  recent.forEach((row, index) => {
+    const score = Math.max(0, Math.min(100, Number(row.ActivityScore || 0)));
+    const x = recent.length <= 1 ? 0 : index * (canvas.width / (recent.length - 1));
+    const y = canvas.height - (score / 100) * canvas.height;
+    if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function render(rows) {
+  if (!rows.length) return;
+  const latest = rows[rows.length - 1];
+  document.getElementById('state').textContent = latest.State || '—';
+  document.getElementById('score').textContent = `${latest.ActivityScore || 0}%`;
+  document.getElementById('networks').textContent = new Set(rows.map(r => r.Bssid).filter(Boolean)).size;
+  document.getElementById('samples').textContent = rows.length;
+  document.getElementById('rows').innerHTML = rows.slice(-20).reverse().map(r => `
+    <tr><td>${r.TimestampUtc || ''}</td><td>${r.Ssid || ''}</td><td>${r.SignalPct || ''}%</td><td>${r.ActivityScore || ''}</td><td>${r.State || ''}</td></tr>`).join('');
+  draw(rows);
+}
+
+fileInput.addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  render(parseCsv(await file.text()));
+});
+</script>
+</body>
+</html>

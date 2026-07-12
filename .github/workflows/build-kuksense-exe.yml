@@ -1,0 +1,71 @@
+name: Build KukSense EXE
+
+on:
+  push:
+    branches:
+      - agent/hardware-free-mvp
+    paths:
+      - 'tools/kuksense-rssi/windows/**'
+      - '.github/workflows/build-kuksense-exe.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tools/kuksense-rssi/windows/**'
+      - '.github/workflows/build-kuksense-exe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ps2exe
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module ps2exe -Scope CurrentUser -Force
+
+      - name: Build standalone executable
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Invoke-PS2EXE `
+            -InputFile 'tools/kuksense-rssi/windows/kuksense-rssi.ps1' `
+            -OutputFile 'dist/KukSense.exe' `
+            -Title 'KukSense' `
+            -Product 'KukSense WiFi Activity Monitor' `
+            -Company 'Kuklabs Inc.' `
+            -Version '0.1.0.0' `
+            -Copyright 'Kuklabs Inc. / RuView contributors' `
+            -RequireAdmin:$false `
+            -NoConsole:$false
+
+      - name: Verify executable
+        shell: powershell
+        run: |
+          if (-not (Test-Path 'dist/KukSense.exe')) {
+            throw 'KukSense.exe was not generated.'
+          }
+          Get-Item 'dist/KukSense.exe' | Format-List Name,Length,LastWriteTime
+
+      - name: Package test build
+        shell: powershell
+        run: |
+          Copy-Item 'tools/kuksense-rssi/README.md' 'dist/README.txt' -ErrorAction SilentlyContinue
+          Compress-Archive -Path 'dist/KukSense.exe','dist/README.txt' -DestinationPath 'KukSense-Windows-Test.zip' -Force
+
+      - name: Upload Windows test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: KukSense-Windows-Test
+          path: KukSense-Windows-Test.zip
+          if-no-files-found: error
+          retention-days: 14

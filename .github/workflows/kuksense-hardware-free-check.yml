@@ -1,0 +1,40 @@
+name: KukSense hardware-free checks
+
+on:
+  push:
+    branches:
+      - agent/hardware-free-mvp
+    paths:
+      - "tools/kuksense-rssi/**"
+      - ".github/workflows/kuksense-hardware-free-check.yml"
+  pull_request:
+    paths:
+      - "tools/kuksense-rssi/**"
+      - ".github/workflows/kuksense-hardware-free-check.yml"
+
+jobs:
+  powershell-syntax:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell scanner
+        shell: pwsh
+        run: |
+          $path = "tools/kuksense-rssi/windows/kuksense-rssi.ps1"
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host "PowerShell syntax is valid."
+
+  dashboard-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify dashboard files
+        run: |
+          test -f tools/kuksense-rssi/dashboard/index.html
+          grep -q "KukSense" tools/kuksense-rssi/dashboard/index.html

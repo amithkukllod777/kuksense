@@ -1,0 +1,41 @@
+name: Build KukSense Native Windows
+on:
+  push:
+    branches: [agent/native-windows-v1, main]
+    paths: ['apps/kuksense-windows/**', '.github/workflows/build-kuksense-native.yml']
+  pull_request:
+    paths: ['apps/kuksense-windows/**', '.github/workflows/build-kuksense-native.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate source
+        run: python -m py_compile apps/kuksense-windows/kuksense.py
+      - name: Install builder
+        run: pip install pyinstaller==6.11.1
+      - name: Build native EXE
+        shell: powershell
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name KukSense --version-file apps/kuksense-windows/version_info.txt apps/kuksense-windows/kuksense.py
+      - name: Smoke-check artifact
+        shell: powershell
+        run: |
+          if (!(Test-Path dist/KukSense.exe)) { throw 'KukSense.exe missing' }
+          $size=(Get-Item dist/KukSense.exe).Length
+          if ($size -lt 1000000) { throw "EXE unexpectedly small: $size bytes" }
+          Get-FileHash dist/KukSense.exe -Algorithm SHA256 | Format-List
+      - name: Package
+        shell: powershell
+        run: Compress-Archive -Path dist/KukSense.exe,apps/kuksense-windows/README.md -DestinationPath KukSense-Windows-v0.1.0.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KukSense-Windows-v0.1.0
+          path: KukSense-Windows-v0.1.0.zip
+          retention-days: 30
